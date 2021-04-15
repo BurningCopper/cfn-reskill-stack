@@ -1,0 +1,304 @@
+Resources:
+  MyInstance1:
+    Type:  AWS::EC2::Instance
+    DependsOn: myVPCGatewayAttachment
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-05d72852800cbf29e
+      Tags:
+        - Key: Name
+          Value: "IML Bootcamp EC2 Instance"
+      UserData: 
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource MyInstance1 --configsets configs --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MyInstance1 --region ${AWS::Region}
+      KeyName: capstone3
+      SubnetId: !Ref myPrivateSubnet1
+      SecurityGroupIds:
+        - !GetAtt mySecurityGroup.GroupId
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          configs:
+            - "config-webapp"
+        config-webapp:
+            packages:
+              yum:
+                php: []
+                httpd: []
+            files:
+              /var/www/html/index.php:
+                content: <?php print "Hello World, IML Bootcamp Instance 1 was here!"; ?>
+                mode: '000600'
+                owner: apache
+                group: apache
+              /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+                content: !Sub |
+                  [cfn-auto-reloader-hook]
+                  triggers=post.update
+                  path=Resources.MyInstance1.Metadata.AWS::CloudFormation::Init
+                  action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource MyInstance1 --configsets configs --region ${AWS::Region}
+                  runas=root
+                mode: "000400"
+                owner: "root"
+                group: "root"
+              /etc/cfn/cfn-hup.conf:
+                content: !Sub |
+                  [main]
+                  stack=${AWS::StackName}
+                  region=${AWS::Region}
+                  interval=1
+                mode: "000400"
+                owner: "root"
+                group: "root"
+            services:
+              sysvinit:
+                httpd:
+                  enabled: 'true'
+                  ensureRunning: 'true'
+                cfn-hup:
+                  enabled: 'true'
+                  ensureRunning: 'true'
+                  files:
+                    - "/etc/cfn/cfn-hup.conf"
+                    - "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
+  MyInstance2:
+    Type:  AWS::EC2::Instance
+    DependsOn: myVPCGatewayAttachment
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-05d72852800cbf29e
+      Tags:
+        - Key: Name
+          Value: "IML Bootcamp EC2 Instance"
+      UserData: 
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource MyInstance2 --configsets configs --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MyInstance2 --region ${AWS::Region}
+      KeyName: capstone3
+      SubnetId: !Ref myPrivateSubnet2
+      SecurityGroupIds:
+        - !GetAtt mySecurityGroup.GroupId
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          configs:
+            - "config-webapp"
+        config-webapp:
+            packages:
+              yum:
+                php: []
+                httpd: []
+            files:
+              /var/www/html/index.php:
+                content: <?php print "Hello World, IML Bootcamp Instance 2 was here!"; ?>
+                mode: '000600'
+                owner: apache
+                group: apache
+              /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+                content: !Sub |
+                  [cfn-auto-reloader-hook]
+                  triggers=post.update
+                  path=Resources.MyInstance2.Metadata.AWS::CloudFormation::Init
+                  action=/opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource MyInstance2 --configsets configs --region ${AWS::Region}
+                  runas=root
+                mode: "000400"
+                owner: "root"
+                group: "root"
+              /etc/cfn/cfn-hup.conf:
+                content: !Sub |
+                  [main]
+                  stack=${AWS::StackName}
+                  region=${AWS::Region}
+                  interval=1
+                mode: "000400"
+                owner: "root"
+                group: "root"
+            services:
+              sysvinit:
+                httpd:
+                  enabled: 'true'
+                  ensureRunning: 'true'
+                cfn-hup:
+                  enabled: 'true'
+                  ensureRunning: 'true'
+                  files:
+                    - "/etc/cfn/cfn-hup.conf"
+                    - "/etc/cfn/hooks.d/cfn-auto-reloader.conf"
+  myVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+  myPrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-east-2a
+      CidrBlock: 10.0.1.0/24
+      VpcId: !Ref myVPC
+  myInternetGateway:
+    Type: AWS::EC2::InternetGateway
+  myVPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref myInternetGateway
+      VpcId: !Ref myVPC
+  myEip:
+    Type: AWS::EC2::EIP
+    DependsOn: myVPCGatewayAttachment
+    # Properties:
+    #   InstanceId: !Ref MyInstance1
+  myEipBak:
+    Type: AWS::EC2::EIP
+    DependsOn: myVPCGatewayAttachment
+    # Properties:
+    #   InstanceId: !Ref MyInstance2
+  myRouteTable1:
+    Type: AWS::EC2::RouteTable 
+    Properties:
+      VpcId: !Ref myVPC
+  myRoute1:
+    Type: AWS::EC2::Route 
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref myInternetGateway
+      RouteTableId: !Ref myRouteTable1
+  # mySubnetRouteTableAssociation1:
+  #   Type: AWS::EC2::SubnetRouteTableAssociation 
+  #   Properties:
+  #     RouteTableId: !Ref myRouteTable1
+  #     SubnetId: !Ref myPublicSubnet1
+  myPrivateRouteTable1:
+    Type: AWS::EC2::RouteTable 
+    Properties:
+      VpcId: !Ref myVPC
+  myPrivateRoute1:
+    Type: AWS::EC2::Route 
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref myPrivateRouteTable1
+      NatGatewayId: !Ref myNATGateway1
+  myPrivateSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation 
+    Properties:
+      RouteTableId: !Ref myPrivateRouteTable1
+      SubnetId: !Ref myPrivateSubnet1
+  myPrivateSubnet2:
+    Type: AWS::EC2::Subnet 
+    Properties:
+      AvailabilityZone: us-east-2b
+      CidrBlock: 10.0.2.0/24
+      VpcId: !Ref myVPC
+  myPrivateSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation 
+    Properties:
+      RouteTableId: !Ref myPrivateRouteTable2
+      SubnetId: !Ref myPrivateSubnet2
+  myPrivateRouteTable2:
+    Type: AWS::EC2::RouteTable 
+    Properties:
+      VpcId: !Ref myVPC
+  myPrivateRoute2:
+    Type: AWS::EC2::Route 
+    Properties: 
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId: !Ref myPrivateRouteTable2
+      NatGatewayId: !Ref myNATGateway2
+  mySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Incoming traffic security group
+      GroupName: WebTrafficAccess
+      SecurityGroupIngress:
+        - IpProtocol: "-1"
+          CidrIp: 0.0.0.0/0
+      VpcId: !Ref myVPC
+  myLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      SecurityGroups:
+        - !GetAtt mySecurityGroup.GroupId
+      Subnets: 
+        - !Ref myPublicSubnet1
+        - !Ref myPublicSubnet2
+  myTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Protocol: HTTP
+      Port: 80
+      Targets:
+        - Id: !Ref MyInstance1
+        - Id: !Ref MyInstance2
+      VpcId: !Ref myVPC
+  myLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref myTargetGroup
+      LoadBalancerArn: !Ref myLoadBalancer
+      Port: 80
+      Protocol: HTTP
+  myListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref myTargetGroup
+      Conditions:
+        - Field: http-request-method
+          HttpRequestMethodConfig:
+            Values:
+              - GET_OR_HEAD
+      ListenerArn: !Ref myLoadBalancerListener
+      Priority: 1
+  myNATGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt myEip.AllocationId
+      SubnetId: !Ref myPublicSubnet1
+  myPublicSubnet1:
+    Type: AWS::EC2::Subnet 
+    Properties:
+      AvailabilityZone: us-east-2a
+      CidrBlock: 10.0.3.0/24
+      VpcId: !Ref myVPC
+  myPublicSubnetRouteTableAssociation1:
+    Type: AWS::EC2::SubnetRouteTableAssociation 
+    Properties:
+      RouteTableId: !Ref myRouteTable1
+      SubnetId: !Ref myPublicSubnet1
+  myNATGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt myEipBak.AllocationId
+      SubnetId: !Ref myPublicSubnet2
+  myPublicSubnet2:
+    Type: AWS::EC2::Subnet 
+    Properties:
+      AvailabilityZone: us-east-2b
+      CidrBlock: 10.0.4.0/24
+      VpcId: !Ref myVPC
+  myPublicSubnetRouteTableAssociation2:
+    Type: AWS::EC2::SubnetRouteTableAssociation 
+    Properties:
+      RouteTableId: !Ref myRouteTable1
+      SubnetId: !Ref myPublicSubnet2
+Outputs:
+  # EC2DNSName:
+  #   Description: Public DNS Output
+  #   Value: !GetAtt MyInstance1.PublicDnsName
+  # EC2DNSName:
+  #   Description: Public DNS Output
+  #   Value: !GetAtt MyInstance2.PublicDnsName
+  LoadBalancerDNSName:
+    Description: Public DNS for LoadBalancer
+    Value: !GetAtt myLoadBalancer.DNSName
